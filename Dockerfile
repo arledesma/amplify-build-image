@@ -69,9 +69,9 @@ ARG \
     NVM_DIR=/opt/nvm
     # NODE_DEFAULT_PACKAGES="grunt-cli bower vuepress gatsby-cli"
 
+# SC2016: "Expressions don't expand in single quotes, use double quotes for that." -- ${VERSION_NODE_DEFAULT} is expanded by docker
+# hadolint ignore=SC2016
 RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
-  # Figure out the nvm install directory - could be $XDG_CONFIG_HOME/.nvm, $NVM_DIR, or $HOME/.nvm
-  # NVM_INSTALL_DIR="$(realpath -m ${XDG_CONFIG_HOME:-${NVM_DIR:-$HOME}} | sed -n -e ':again' -e 's@/\.nvm$@@g;/\.nvm$/t again; p')/.nvm"
   # Install NVM
   mkdir -p "${NVM_DIR}"
   curl -o- -sSL "https://raw.githubusercontent.com/nvm-sh/nvm/v${VERSION_NVM}/install.sh" | bash
@@ -106,7 +106,7 @@ RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   ls -l "${NVM_DIR}/versions/node/"
   ls -l "${NVM_DIR}/versions/node/${VERSION_NODE_DEFAULT}"
   nvm install --no-progress --latest-npm --default "$VERSION_NODE_DEFAULT"
-  npm config -g set user $(whoami)
+  npm config -g set user "$(whoami)"
   npm config -g set unsafe-perm true
   nvm cache clear
 RUN_EOT
@@ -172,15 +172,16 @@ ENV \
   _X11_NO_MITSHM=1 \
   _MITSHM=0
 
+# SC2174 - "When used with -p, -m only applies to the deepest directory." - We only need the permission of the deepest directory to be set for ${CYPRESS_CACHE_FOLDER}
+# hadolint ignore=SC2174
 RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   # Install Cypress
   source "${NVM_DIR}/nvm.sh"
   # nvm use "${VERSION_NODE_DEFAULT}"
-  export npm_config_unsafe_perm=true npm_config_user=root
-  npm config set user 0
-  npm config set unsafe-perm true
+  npm config -g set user "$(whoami)"
+  npm config -g set unsafe-perm true
   mkdir -m 1777 -p "${CYPRESS_CACHE_FOLDER}"
-  npm install -g --allow-root cypress@${VERSION_CYPRESS}
+  npm install -g --allow-root "cypress@${VERSION_CYPRESS}"
   cypress install
   nvm cache clear
 RUN_EOT
@@ -189,12 +190,12 @@ RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   # https://github.com/aws/aws-codebuild-docker-images/blob/981cb94e134b323d626a28d41148634f20fbb5ce/al2/x86_64/standard/3.0/Dockerfile#L84-L94
   CHROME_VERSION="$(chromium-browser --version | awk -F '[ .]' '{print $2"."$3"."$4}')"
   CHROME_DRIVER_VERSION="$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")"
-  wget -qO /root/.cache/chromedriver_linux64.zip https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip
+  wget -qO /root/.cache/chromedriver_linux64.zip "https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip"
   unzip -q /root/.cache/chromedriver_linux64.zip -d /opt
   rm /root/.cache/chromedriver_linux64.zip
-  mv /opt/chromedriver /opt/chromedriver-$CHROME_DRIVER_VERSION
-  chmod 755 /opt/chromedriver-$CHROME_DRIVER_VERSION
-  ln -s /opt/chromedriver-$CHROME_DRIVER_VERSION /usr/bin/chromedriver
+  mv /opt/chromedriver "/opt/chromedriver-$CHROME_DRIVER_VERSION"
+  chmod 755 "/opt/chromedriver-$CHROME_DRIVER_VERSION"
+  ln -s "/opt/chromedriver-$CHROME_DRIVER_VERSION" /usr/bin/chromedriver
 RUN_EOT
 
 FROM base as node14
@@ -217,17 +218,21 @@ FROM base as awscliv2
 ############################
 ARG VERSION_AWSCLIV2="2.3.6"
 
+# DL3013 - "Pin versions in pip. Instead of `pip install <package>` use `pip install <package>==<version>` or `pip install --requirement <requirements file>`"
+# hadolint ignore=DL3013
 RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   # Install awscli v1 (/usr/local/bin/aws)
-  pip3 install awscli
+  # --no-cache-dir is redundant with the tmpfs mounted to /root/.cache but we do not have to worry about pip moving the cache directory with the argument
+  pip3 install --no-cache-dir awscli
   # Install SAM CLI
-  pip3 install aws-sam-cli
+  pip3 install --no-cache-dir aws-sam-cli
   {
     # This should not exist in our layer but safely clean up the pip cache directory anyways
-    [ -d "$(pip3 cache dir)" ] && \
-    [ "$(dirname "$(pip3 cache dir)")" != "." ] && \
-    [ "$(dirname "$(pip3 cache dir)")" != "/" ] && \
-    rm -rf "$(pip3 cache dir)"/*;
+    pipcachedir="$(pip3 cache dir)";
+    [ -d "${pipcachedir}" ] && \
+    [ "$(dirname "${pipcachedir}")" != "." ] && \
+    [ "$(dirname "${pipcachedir}")" != "/" ] && \
+    rm -rf "${pipcachedir:?}"/*;
   }
 RUN_EOT
 
@@ -236,13 +241,13 @@ ENV PATH="${PATH}:${AWSCLIPATH}}"
 
 RUN --mount=type=tmpfs,target=/opt/tmpfs <<RUN_EOT
   # Install awscli v2 (${AWSCLIPATH})
-  cd "/opt/tmpfs/"
+  cd "/opt/tmpfs/" || exit 1
   if [ "${VERSION_AWSCLIV2}" = "latest" ]; then awscliv2_version=""; else awscliv2_version="-${VERSION_AWSCLIV2}"; fi
   curl -sSL -o "/opt/tmpfs/awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-x86_64${awscliv2_version}.zip"
   unzip "/opt/tmpfs/awscliv2.zip" && \
   /opt/tmpfs/aws/install --bin-dir "${AWSCLIPATH}/"
   rm -rf "/opt/tmpfs/aws" "/opt/tmpfs/awscliv2.zip"
-  cd "/root"
+  cd "/root" || exit 1
 RUN_EOT
 
 RUN <<RUN_EOT
@@ -259,7 +264,7 @@ FROM base as hugo
 ARG VERSION_HUGO="0.89.2"
 
 RUN --mount=type=tmpfs,target=/opt/tmpfs <<RUN_EOT
-  cd "/opt/tmpfs"
+  cd "/opt/tmpfs" || exit 1
   ## Install Hugo
   curl -sSL -o "/opt/tmpfs/hugo.tar.gz" "https://github.com/gohugoio/hugo/releases/download/v${VERSION_HUGO}/hugo_${VERSION_HUGO}_Linux-64bit.tar.gz"
   tar -xf "/opt/tmpfs/hugo.tar.gz" hugo -C /opt/tmpfs/
@@ -270,7 +275,7 @@ RUN --mount=type=tmpfs,target=/opt/tmpfs <<RUN_EOT
   tar -xf "/opt/tmpfs/hugo_extended.tar.gz" hugo -C /opt/tmpfs/
   mv "/opt/tmpfs/hugo" "/usr/bin/hugo_extended"
   rm -rf "/opt/tmpfs/hugo_extended.tar.gz"
-  cd "/root"
+  cd "/root" || exit 1
 RUN_EOT
 
 FROM base as ruby
@@ -352,11 +357,13 @@ COPY --from=awscliv2 "/opt/awscliv2/" "/opt/awscliv2/"
 COPY --from=awscliv2 "/usr/local/aws-cli/" "/usr/local/aws-cli/"
 COPY --from=hugo "/usr/bin/hugo" "/usr/bin/hugo_extended" /usr/bin/
 
+# SC2016: "Expressions don't expand in single quotes, use double quotes for that." -- ${PATH} should not be expanded until runtime
+# hadolint ignore=SC2016
 RUN --mount=type=bind,from=awscliv2,source=/root,target=/source <<RUN_EOT
   {
     echo '';
     grep '#PATH# ' "/source/.bashrc" || echo "";
-    sed -n '/#PATH# /{s/.*#PATH# //p}' "/source/.bashrc" | xargs -n1 -I{} echo 'export PATH="${PATH}:{}";';
+    sed -n '/#PATH# /{s/.*#PATH# //p}' "/source/.bashrc" | xargs -n1 -I{} echo 'export PATH="\${PATH}:{}";';
     echo '';
   } | tee -a "${HOME}/.bashrc"
 RUN_EOT
