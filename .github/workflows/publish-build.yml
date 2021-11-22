@@ -132,7 +132,7 @@ jobs:
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          file: ./compose/django/Dockerfile
+          file: ./Dockerfile
           platforms: ${{ env.PLATFORMS }}
           push: ${{ contains(fromJson('["push", "schedule"]'), github.event_name) }}
           labels: ${{ steps.meta.outputs.labels }}
