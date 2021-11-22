@@ -37,10 +37,27 @@ jobs:
           dockerhub_token_exists="false";
           dockerhub_username_exists="false";
           dockerhub_namespace_exists="false";
-          [[ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]] && dockerhub_token_exists="true";
-          [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]] && dockerhub_username_exists="true";
-          [[ -n "${{ secrets.DOCKERHUB_NAMESPACE }}" ]] && dockerhub_namespace_exists="true";
-          [[ "true" = "${{ secrets.GITHUB_CONTAINER_PUSH_DISABLED }}" ]] && github_container_push="false";
+
+          dockerhub_token="${{ secrets.DOCKERHUB_TOKEN }}";
+          if [[ -n "${dockerhub_token}" ]]; then
+            dockerhub_token_exists="true";
+          fi
+
+          dockerhub_username="${{ secrets.DOCKERHUB_USERNAME }}";
+          if [[ -n "${dockerhub_username}" ]]; then
+            dockerhub_username_exists="true";
+          fi
+
+          dockerhub_namespace="${{ secrets.DOCKERHUB_NAMESPACE }}";
+          if [[ -n "${dockerhub_namespace}" ]]; then
+            dockerhub_namespace_exists="true";
+          fi
+
+          github_container_push_disabled="${{ secrets.GITHUB_CONTAINER_PUSH_DISABLED }}";
+          if [[ "true" = "${github_container_push_disabled}" ]]; then
+            github_container_push="false";
+          fi
+
           echo "::set-output name=dockerhub_token_exists::${dockerhub_token_exists}";
           echo "::set-output name=dockerhub_username_exists::${dockerhub_username_exists}";
           echo "::set-output name=dockerhub_namespace_exists::${dockerhub_namespace_exists}";
@@ -50,15 +67,20 @@ jobs:
         run: |
           repository_name="$(basename "${GITHUB_REPOSITORY}")";
           images=();
-          if [[ "${{ steps.from_secrets.outputs.github_container_push }}" = "true" ]];
+          github_container_push="${{ steps.from_secrets.outputs.github_container_push }}";
+          if [[ "${github_container_push}" = "true" ]];
           then
             # set GITHUB_CONTAINER_PUSH_DISABLED to a value of true to disable pushing to github container registry
             images+=("ghcr.io/${GITHUB_REPOSITORY}");
           fi
-          if [[ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]] && [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]] && [[ -n "${{ secrets.DOCKERHUB_NAMESPACE }}" ]];
+
+          dockerhub_token="${{ secrets.DOCKERHUB_TOKEN }}";
+          dockerhub_username="${{ secrets.DOCKERHUB_USERNAME }}";
+          dockerhub_namespace="${{ secrets.DOCKERHUB_NAMESPACE }}";
+          if [[ -n "${dockerhub_token}" ]] && [[ -n "${dockerhub_username}" ]] && [[ -n "${dockerhub_namespace}" ]];
           then
             # dockerhub repository should be the same as the github repository name, within the dockerhub namespace (organization or personal)
-            images+=("${{ secrets.DOCKERHUB_NAMESPACE }}/${repository_name}");
+            images+=("${dockerhub_namespace}/${repository_name}");
           fi
           # join the array for Docker meta job to produce image tags
           # https://github.com/crazy-max/ghaction-docker-meta#inputs
