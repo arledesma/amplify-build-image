@@ -86,7 +86,7 @@ RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   ) /usr/bin/node
   ln /usr/bin/node /usr/bin/npm
   ln /usr/bin/node /usr/bin/npx
-  NVM_DEFAULT_PACKAGES_CONFIGURATION="${NPM_DIR}/default-packages"
+  NVM_DEFAULT_PACKAGES_CONFIGURATION="${NVM_DIR}/default-packages"
   echo "Configuring NVM to install default packages:"
   mkdir -vp "$(dirname "${NVM_DEFAULT_PACKAGES_CONFIGURATION}")"
   {
