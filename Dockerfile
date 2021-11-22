@@ -69,7 +69,7 @@ ARG \
     NVM_DIR=/opt/nvm
     # NODE_DEFAULT_PACKAGES="grunt-cli bower vuepress gatsby-cli"
 
-# SC2016: "Expressions don't expand in single quotes, use double quotes for that." -- ${VERSION_NODE_DEFAULT} is expanded by docker
+# SC2016: "Expressions don't expand in single quotes, use double quotes for that." -- ${VERSION_NODE_DEFAULT} and $0 are expanded at runtime
 # hadolint ignore=SC2016
 RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   # Install NVM
@@ -78,12 +78,23 @@ RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   curl -o- -sSL "https://raw.githubusercontent.com/nvm-sh/nvm/v${VERSION_NVM}/install.sh" | bash
   # Configure default global packages to be installed via NVM when installing new versions of node
   source "${NVM_DIR}/nvm.sh"
-  # SHIM for node, npm, and npx to nvm
+  # SHIM for nvm
   chmod 755 "${NVM_DIR}/nvm-exec"
   install <(
     echo '#!/usr/bin/env bash';
-    echo '[ -z "$(nvm current 2>/dev/null || echo -n '')" ] && NODE_VERSION="\${VERSION_NODE_DEFAULT:-${VERSION_NODE_DEFAULT}}";';
-    echo '${NVM_DIR}/nvm-exec "$@"';
+    echo '# This will not execute if you have loaded the nvm function. The function will execute before the command.';
+    echo '# If you wish to run this command while nvm is loaded then call it via `command nvm` or `/usr/bin/nvm`';
+    echo '# Alternatively you may unload the function via `nvm unload`';
+    echo 'source "${NVM_DIR:='${NVM_DIR}'}/nvm.sh";';
+    echo 'nvm "$@";';
+  ) /usr/bin/nvm
+  # SHIM for node, npm, and npx to nvm
+  install <(
+    echo '#!/usr/bin/env bash';
+    echo 'if [ -n "$(nvm current 2>/dev/null || true)" ] && [ -z "$NODE_VERSION" ]; then NODE_VERSION="$(nvm current | sed -e s/^v//)"; fi';
+    echo 'export NODE_VERSION;'
+    echo 'if [ -z "$(nvm current 2>/dev/null || true)" ] || [ -z "$NODE_VERSION" ]; then NODE_VERSION="${VERSION_NODE_DEFAULT:-'${VERSION_NODE_DEFAULT}'}"; fi';
+    echo '"${NVM_DIR:='${NVM_DIR}'}/nvm-exec" "$(basename "$0")" "$@";';
   ) /usr/bin/node
   ln /usr/bin/node /usr/bin/npm
   ln /usr/bin/node /usr/bin/npx
