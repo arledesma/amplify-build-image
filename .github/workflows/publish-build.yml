@@ -77,7 +77,6 @@ jobs:
             type=schedule,pattern={{date 'YYYYMMDD'}}
             type=edge,branch=main
             type=ref,event=branch
-            type=ref,event=push
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
