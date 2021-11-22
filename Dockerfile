@@ -73,6 +73,7 @@ ARG \
 # hadolint ignore=SC2016
 RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   # Install NVM
+  : "${NVM_DIR:?NVM_DIR is not set or has no value}";
   mkdir -p "${NVM_DIR}"
   curl -o- -sSL "https://raw.githubusercontent.com/nvm-sh/nvm/v${VERSION_NVM}/install.sh" | bash
   # Configure default global packages to be installed via NVM when installing new versions of node
@@ -86,7 +87,7 @@ RUN --mount=type=tmpfs,target=/root/.cache/ <<RUN_EOT
   ) /usr/bin/node
   ln /usr/bin/node /usr/bin/npm
   ln /usr/bin/node /usr/bin/npx
-  NVM_DEFAULT_PACKAGES_CONFIGURATION="${NPM_DIR}/default-packages"
+  NVM_DEFAULT_PACKAGES_CONFIGURATION="${NVM_DIR}/default-packages"
   echo "Configuring NVM to install default packages:"
   mkdir -vp "$(dirname "${NVM_DEFAULT_PACKAGES_CONFIGURATION}")"
   {
