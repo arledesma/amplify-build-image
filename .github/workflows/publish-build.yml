@@ -153,7 +153,7 @@ jobs:
           # Setting context causes 'buildx failed with: error: failed to solve: failed to read dockerfile: open /tmp/buildkit-mountXXXXXXXXX/Dockerfile: no such file or directory'
           # context: .
           platforms: linux/amd64
-          push: ${{ contains(fromJson('["push", "schedule"]'), github.event_name) }}
+          push: ${{ contains(fromJson('["push", "schedule", "release"]'), github.event_name) }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
