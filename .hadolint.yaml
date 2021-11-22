@@ -1,0 +1,5 @@
+ignored:
+  - DL3033 # Not limiting to a specific package version - we want the current packages
+  - DL4006 # SHELL uses -o pipefail
+  - SC2039 # SHELL is bash, not sh - we have 'source'
+  - DL3003 # No need to use WORKDIR for temporary cd
