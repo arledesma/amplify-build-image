@@ -99,7 +99,7 @@ jobs:
           echo "::set-output name=images::$(IFS=,; echo "${images[*]}")";
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v3
+        uses: docker/metadata-action@v4
         with:
           images: ${{ steps.generate_image_names.outputs.images }}
           labels: |
